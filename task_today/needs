@@ -1,0 +1,26 @@
+TASK FOR ADMIN DASHBOARD
+-Orders
+-Status (kasama ang pangalan ng driver sa bawat order)
+-Products
+-Customers
+-Drivers (Available / On delivery ngayon + kasalukuyang order)
+-Inventory
+-Record
+-Salary
+-logout
+
+TASK FOR Delivery DASHBOARD
+
+-Order Today, naka-group bawat Barangay
+-Map (lokasyon ng customer)
+-Customer Name, Phone, Address at Landmark
+-Items (uri at dami ng galon)
+-Total Amount
+-Payment Status (Paid, Unpaid)
+-Assign Driver
+-Delivery Status (Pending, Out for delivery, Delivered)
+-Delivery History
+
+paki check sa gilid kong okay gawa nyo example (/)
+
+STAFF COMMMING SOON......

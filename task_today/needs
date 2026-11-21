@@ -1,13 +1,315 @@
 TASK FOR ADMIN DASHBOARD
--Orders
--Status (kasama ang pangalan ng driver sa bawat order)
--Products
--Customers
--Drivers (Available / On delivery ngayon + kasalukuyang order)
--Inventory
--Record
--Salary
--logout
+-Orders - <div id="tab-orders" class="section active">
+  <div class="card">
+    <h3>Create New Water Order</h3>
+    <form onsubmit="createOrder(event)" class="form-grid">
+      <select id="ord-customer" required></select>
+      <select id="ord-product" required></select>
+      <input type="number" id="ord-qty" min="1" value="1" placeholder="Quantity (Galon)" required />
+      <select id="ord-payment">
+        <option value="Unpaid">Unpaid</option>
+        <option value="Paid">Paid</option>
+      </select>
+      <button type="submit" class="primary">+ Add Order</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>All Orders & Status (with Assigned Driver)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Order #</th><th>Customer</th><th>Barangay</th><th>Items</th>
+          <th>Total</th><th>Assigned Driver</th><th>Payment</th><th>Delivery Status</th>
+        </tr>
+      </thead>
+      <tbody id="admin-orders-body"></tbody>
+    </table>
+  </div>
+</div>
+
+
+ADMIN.HTML
+// Display orders kasama ang driver_name
+document.getElementById('admin-orders-body').innerHTML = appData.orders.map(o => `
+  <tr>
+    <td>#${o.order_id}</td>
+    <td>${o.customer_name}</td>
+    <td>${o.barangay}</td>
+    <td>${o.items_summary || '-'}</td>
+    <td>₱${parseFloat(o.total_amount).toFixed(2)}</td>
+    <td><strong>${o.driver_name || '<span style="color:#94a3b8">Unassigned</span>'}</strong></td>
+    <td><span class="badge ${o.payment_status === 'Paid' ? 'paid' : 'unpaid'}">${o.payment_status}</span></td>
+    <td><span class="badge ${o.delivery_status === 'Delivered' ? 'delivered' : (o.delivery_status === 'Out for delivery' ? 'transit' : 'pending')}">${o.delivery_status}</span></td>
+  </tr>
+`).join('');
+
+// Pag-save ng bagong order
+async function createOrder(e) {
+  e.preventDefault();
+  await fetch('api.php?action=create_order', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      customer_id: document.getElementById('ord-customer').value,
+      product_id: document.getElementById('ord-product').value,
+      quantity: document.getElementById('ord-qty').value,
+      payment_status: document.getElementById('ord-payment').value
+    })
+  });
+  loadData();
+}
+
+
+-Status (kasama ang pangalan ng driver sa bawat order) - <div id="tab-drivers" class="section">
+  <div class="card">
+    <h3>Register Driver (with RFID UID for IoT)</h3>
+    <form onsubmit="addDriver(event)" class="form-grid">
+      <input type="text" id="drv-uid" placeholder="RFID UID (e.g. A1B2C3D4)" required />
+      <input type="text" id="drv-name" placeholder="Driver Full Name" required />
+      <input type="text" id="drv-phone" placeholder="Contact No." required />
+      <input type="text" id="drv-plate" placeholder="Vehicle Plate" required />
+      <input type="number" id="drv-daily" value="500" placeholder="Daily Rate" required />
+      <input type="number" id="drv-perdel" value="15" placeholder="Per Delivery Bonus" required />
+      <button type="submit" class="primary">+ Add Driver</button>
+    </form>
+    <table>
+      <thead><tr><th>Driver</th><th>RFID UID</th><th>Vehicle</th><th>Status Ngayon</th><th>Kasalukuyang Order</th><th>Last GPS</th></tr></thead>
+      <tbody id="admin-drivers-body"></tbody>
+    </table>
+  </div>
+</div>
+JS - document.getElementById('admin-drivers-body').innerHTML = appData.drivers.map(d => `
+  <tr>
+    <td><strong>${d.full_name}</strong></td>
+    <td><code>${d.rfid_uid}</code></td>
+    <td>${d.vehicle_plate || '-'}</td>
+    <td><span class="badge ${d.status === 'Available' ? 'avail' : 'ondel'}">${d.status}</span></td>
+    <td>${d.current_order || 'Wala'}</td>
+    <td>${d.live_lat ? `${parseFloat(d.live_lat).toFixed(5)}, ${parseFloat(d.live_lng).toFixed(5)}` : 'No GPS yet'}</td>
+  </tr>
+`).join('');
+PHP - $driversSql = "
+    SELECT d.*,
+        (
+            SELECT CONCAT('#', o2.order_id, ' - ', c2.full_name, ' (', c2.barangay, ')')
+            FROM orders o2
+            INNER JOIN customers c2 ON c2.customer_id = o2.customer_id
+            WHERE o2.driver_id = d.driver_id AND o2.delivery_status = 'Out for delivery'
+            ORDER BY o2.order_id DESC LIMIT 1
+        ) AS current_order
+    FROM drivers d
+    ORDER BY d.driver_id ASC
+";
+-Products - HTML <div id="tab-products" class="section">
+  <div class="card">
+    <h3>Add New Product</h3>
+    <form onsubmit="addProduct(event)" class="form-grid">
+      <input type="text" id="prod-name" placeholder="Product Name (e.g. Purified Slim)" required />
+      <input type="text" id="prod-unit" placeholder="Unit (e.g. Slim Gallon)" required />
+      <input type="number" step="0.01" id="prod-price" placeholder="Price (PHP)" required />
+      <input type="number" id="prod-stock" placeholder="Initial Stock" required />
+      <button type="submit" class="primary">+ Save Product</button>
+    </form>
+    <table>
+      <thead><tr><th>ID</th><th>Product Name</th><th>Unit</th><th>Price</th><th>Stock</th></tr></thead>
+      <tbody id="admin-products-body"></tbody>
+    </table>
+  </div>
+</div>
+JS - document.getElementById('admin-products-body').innerHTML = appData.products.map(p => `
+  <tr><td>${p.product_id}</td><td>${p.product_name}</td><td>${p.unit_label}</td><td>₱${p.price}</td><td>${p.stock_qty}</td></tr>
+`).join('');
+
+async function addProduct(e) {
+  e.preventDefault();
+  await fetch('api.php?action=save_product', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      product_name: document.getElementById('prod-name').value,
+      unit_label: document.getElementById('prod-unit').value,
+      price: document.getElementById('prod-price').value,
+      stock_qty: document.getElementById('prod-stock').value
+    })
+  });
+  e.target.reset();
+  loadData();
+}
+-Customers - <div id="tab-customers" class="section">
+  <div class="card">
+    <h3>Register Customer</h3>
+    <form onsubmit="addCustomer(event)" class="form-grid">
+      <input type="text" id="cust-name" placeholder="Full Name" required />
+      <input type="text" id="cust-phone" placeholder="Phone Number" required />
+      <input type="text" id="cust-brgy" value="Brgy. Wawa" placeholder="Barangay" required />
+      <input type="text" id="cust-addr" placeholder="Street / Sitio Address" required />
+      <input type="text" id="cust-landmark" placeholder="Landmark" />
+      <input type="number" step="any" id="cust-lat" value="14.0725" placeholder="Latitude" />
+      <input type="number" step="any" id="cust-lng" value="120.6318" placeholder="Longitude" />
+      <button type="submit" class="primary">+ Save Customer</button>
+    </form>
+    <table>
+      <thead><tr><th>Name</th><th>Phone</th><th>Barangay</th><th>Address</th><th>Landmark</th></tr></thead>
+      <tbody id="admin-customers-body"></tbody>
+    </table>
+  </div>
+</div>
+
+JS.HTML
+document.getElementById('admin-customers-body').innerHTML = appData.customers.map(c => `
+  <tr><td>${c.full_name}</td><td>${c.phone}</td><td>${c.barangay}</td><td>${c.address_line}</td><td>${c.landmark || '-'}</td></tr>
+`).join('');
+
+async function addCustomer(e) {
+  e.preventDefault();
+  await fetch('api.php?action=add_customer', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      full_name: document.getElementById('cust-name').value,
+      phone: document.getElementById('cust-phone').value,
+      barangay: document.getElementById('cust-brgy').value,
+      address_line: document.getElementById('cust-addr').value,
+      landmark: document.getElementById('cust-landmark').value,
+      latitude: document.getElementById('cust-lat').value,
+      longitude: document.getElementById('cust-lng').value
+    })
+  });
+  e.target.reset();
+  loadData();
+}
+
+-Drivers (Available / On delivery ngayon + kasalukuyang order) - <div id="tab-drivers" class="section">
+  <div class="card">
+    <h3>Register Driver (with RFID UID for IoT)</h3>
+    <form onsubmit="addDriver(event)" class="form-grid">
+      <input type="text" id="drv-uid" placeholder="RFID UID (e.g. A1B2C3D4)" required />
+      <input type="text" id="drv-name" placeholder="Driver Full Name" required />
+      <input type="text" id="drv-phone" placeholder="Contact No." required />
+      <input type="text" id="drv-plate" placeholder="Vehicle Plate" required />
+      <input type="number" id="drv-daily" value="500" placeholder="Daily Rate" required />
+      <input type="number" id="drv-perdel" value="15" placeholder="Per Delivery Bonus" required />
+      <button type="submit" class="primary">+ Add Driver</button>
+    </form>
+    <table>
+      <thead><tr><th>Driver</th><th>RFID UID</th><th>Vehicle</th><th>Status Ngayon</th><th>Kasalukuyang Order</th><th>Last GPS</th></tr></thead>
+      <tbody id="admin-drivers-body"></tbody>
+    </table>
+  </div>
+</div>
+JS - document.getElementById('admin-drivers-body').innerHTML = appData.drivers.map(d => `
+  <tr>
+    <td><strong>${d.full_name}</strong></td>
+    <td><code>${d.rfid_uid}</code></td>
+    <td>${d.vehicle_plate || '-'}</td>
+    <td><span class="badge ${d.status === 'Available' ? 'avail' : 'ondel'}">${d.status}</span></td>
+    <td>${d.current_order || 'Wala'}</td>
+    <td>${d.live_lat ? `${parseFloat(d.live_lat).toFixed(5)}, ${parseFloat(d.live_lng).toFixed(5)}` : 'No GPS yet'}</td>
+  </tr>
+`).join('');
+PHP - $driversSql = "
+    SELECT d.*,
+        (
+            SELECT CONCAT('#', o2.order_id, ' - ', c2.full_name, ' (', c2.barangay, ')')
+            FROM orders o2
+            INNER JOIN customers c2 ON c2.customer_id = o2.customer_id
+            WHERE o2.driver_id = d.driver_id AND o2.delivery_status = 'Out for delivery'
+            ORDER BY o2.order_id DESC LIMIT 1
+        ) AS current_order
+    FROM drivers d
+    ORDER BY d.driver_id ASC
+";
+-Inventory - <div id="tab-inventory" class="section">
+  <div class="card">
+    <h3>Gallon & Water Inventory</h3>
+    <table>
+      <thead><tr><th>Product</th><th>Unit</th><th>Price</th><th>Current Stock</th><th>Update Stock</th></tr></thead>
+      <tbody id="admin-inventory-body"></tbody>
+    </table>
+  </div>
+</div>
+JS - document.getElementById('admin-inventory-body').innerHTML = appData.products.map(p => `
+  <tr>
+    <td>${p.product_name}</td>
+    <td>${p.unit_label}</td>
+    <td>₱${p.price}</td>
+    <td><strong>${p.stock_qty}</strong></td>
+    <td>
+      <input type="number" id="stk-${p.product_id}" value="${p.stock_qty}" style="width:80px; display:inline-block;" />
+      <button class="primary" onclick="updateStock(${p.product_id}, ${p.price})">Save</button>
+    </td>
+  </tr>
+`).join('');
+
+async function updateStock(id, price) {
+  const stock = document.getElementById('stk-' + id).value;
+  await fetch('api.php?action=save_product', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ product_id: id, price: price, stock_qty: stock })
+  });
+  loadData();
+}
+-Record - <div id="tab-records" class="section">
+  <div class="card">
+    <h3>Completed Delivery & Sales Records</h3>
+    <table>
+      <thead><tr><th>Order #</th><th>Date Delivered</th><th>Customer</th><th>Barangay</th><th>Driver</th><th>Items</th><th>Amount</th></tr></thead>
+      <tbody id="admin-records-body"></tbody>
+    </table>
+  </div>
+</div>
+JS - const delivered = appData.orders.filter(o => o.delivery_status === 'Delivered');
+document.getElementById('admin-records-body').innerHTML = delivered.map(o => `
+  <tr>
+    <td>#${o.order_id}</td>
+    <td>${o.delivered_at || o.order_date}</td>
+    <td>${o.customer_name}</td>
+    <td>${o.barangay}</td>
+    <td>${o.driver_name || '-'}</td>
+    <td>${o.items_summary}</td>
+    <td>₱${parseFloat(o.total_amount).toFixed(2)}</td>
+  </tr>
+`).join('');
+-Salary - <div id="tab-salary" class="section">
+  <div class="card">
+    <h3>Driver Salary Computation</h3>
+    <table>
+      <thead><tr><th>Driver</th><th>Daily Base Rate</th><th>Rate / Delivery</th><th>Completed Deliveries</th><th>Total Estimated Pay</th></tr></thead>
+      <tbody id="admin-salary-body"></tbody>
+    </table>
+  </div>
+</div>
+JS- document.getElementById('admin-salary-body').innerHTML = appData.salaries.map(s => `
+  <tr>
+    <td><strong>${s.full_name}</strong></td>
+    <td>₱${parseFloat(s.daily_rate).toFixed(2)}</td>
+    <td>₱${parseFloat(s.per_delivery_rate).toFixed(2)}</td>
+    <td>${s.completed_deliveries}</td>
+    <td><strong>₱${parseFloat(s.estimated_pay).toFixed(2)}</strong></td>
+  </tr>
+`).join('');
+PHP - $salarySql = "
+    SELECT d.driver_id, d.full_name, d.daily_rate, d.per_delivery_rate,
+           COUNT(o.order_id) AS completed_deliveries,
+           (d.daily_rate + (COUNT(o.order_id) * d.per_delivery_rate)) AS estimated_pay
+    FROM drivers d
+    LEFT JOIN orders o ON o.driver_id = d.driver_id AND o.delivery_status = 'Delivered'
+    GROUP BY d.driver_id
+";
+
+-logout - <button class="nav-btn logout" onclick="logout()">🚪 Logout</button>
+
+<script>
+function logout() {
+  if (confirm('Sigurado ka bang gusto mong mag-logout?')) {
+    window.location.href = 'login.html';
+  }
+}
+</script>
+
+
 
 TASK FOR Delivery DASHBOARD
 
